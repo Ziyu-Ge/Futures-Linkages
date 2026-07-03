@@ -79,6 +79,39 @@
 
 ## 3. 数据覆盖与结果产物
 
+本节结果来自 `process.py`。设品种为 \(i\)，分钟时点为 \(m\)，交易日为 \(t\)，日收盘价为 \(C_{i,t}\)，日收益率为 \(r_{i,t}\)。夜盘分钟先映射到下一白天交易日：
+
+\[
+\text{target\_date}_m=\text{date}_m+\mathbf{1}\{\text{hour}_m \ge 21\}
+\]
+
+\[
+\text{trade\_date}_m=\min\{d \in \mathcal{C}_i: d \ge \text{target\_date}_m\}
+\]
+
+其中 \(\mathcal{C}_i\) 是该品种白天 9 点到 15 点出现过的交易日集合。随后按 `symbol + trade_date` 聚合分钟 K 线：
+
+\[
+O_{i,t}=\text{first open},\quad
+H_{i,t}=\max(\text{high}),\quad
+L_{i,t}=\min(\text{low}),\quad
+C_{i,t}=\text{last close}
+\]
+
+\[
+V_{i,t}=\sum_m \text{volume}_{i,m},\quad
+T_{i,t}=\sum_m \text{total\_turnover}_{i,m},\quad
+OI_{i,t}=\text{last open\_interest}
+\]
+
+日收益率使用简单收益率：
+
+\[
+r_{i,t}=\frac{C_{i,t}}{C_{i,t-1}}-1
+\]
+
+因此，后续所有相关、领先、Granger 和 VAR 统计都基于日收益率矩阵，而不是分钟级原始数据。
+
 ### 3.1 数据覆盖
 
 | 指标 | 数值 |
@@ -156,6 +189,25 @@
 
 ## 4. 同步相关结果
 
+本节对应 `instrument_corr_by_group.py`。对每个分组 \(g\)，先把日收益率转成矩阵：
+
+\[
+R_g(t,i)=r_{i,t}
+\]
+
+然后计算组内任意两个品种 \(i,j\) 的 Pearson 同步相关：
+
+\[
+\rho_{ij}
+=
+\text{corr}(r_{i,t}, r_{j,t})
+=
+\frac{\sum_t (r_{i,t}-\bar r_i)(r_{j,t}-\bar r_j)}
+{\sqrt{\sum_t (r_{i,t}-\bar r_i)^2}\sqrt{\sum_t (r_{j,t}-\bar r_j)^2}}
+\]
+
+这个指标衡量两个品种是否同涨同跌，不包含领先方向。相关系数越接近 1，同向同步性越强；越接近 -1，反向同步性越强。
+
 静态同日相关一共覆盖 91 个组内无向品种对，整体分布如下：
 
 | 指标 | 数值 |
@@ -201,6 +253,42 @@
 
 ## 5. 滞后相关与方向性领先
 
+本节对应 `lag_corr_by_group.py`。对 \(k \in \{1,2,3,5\}\) 天滞后，代码用 `table.shift(-lag)` 将跟随品种的未来收益对齐到当前日，因此方向 \(i \rightarrow j\) 的滞后相关为：
+
+\[
+\rho_{i \rightarrow j}^{(k)}
+=
+\text{corr}(r_{i,t}, r_{j,t+k})
+\]
+
+反方向为：
+
+\[
+\rho_{j \rightarrow i}^{(k)}
+=
+\text{corr}(r_{j,t}, r_{i,t+k})
+\]
+
+方向优势定义为两者之差：
+
+\[
+\text{lead\_edge}_{i \rightarrow j}^{(k)}
+=
+\rho_{i \rightarrow j}^{(k)}
+-
+\rho_{j \rightarrow i}^{(k)}
+\]
+
+筛选规则为：
+
+\[
+|\rho_{i \rightarrow j}^{(k)}| \ge 0.05
+\quad \text{and} \quad
+\text{lead\_edge}_{i \rightarrow j}^{(k)} \ge 0.05
+\]
+
+因此，进入 `lead_edges.csv` 的方向需要同时满足“自身滞后相关不太弱”和“相对反方向有明显优势”。
+
 `lag_corr_by_group/lead_edges.csv` 使用阈值 `abs(lag_corr) >= 0.05` 且 `lead_edge >= 0.05` 筛选，最终得到 27 条方向性边。
 
 | lag | 边数 |
@@ -228,6 +316,52 @@
 滞后相关的有用信息集中在几个板块：有色基本金属、聚酯产业链、新能源材料、烯烃塑料、煤化工建材和金融期货。其中 `PS -> LC`、`PX -> PR`、`IF -> IM` 后续也被其他方法支持，可信度更高。
 
 ## 6. 残差相关结果
+
+本节对应 `residual_corr_by_group.py`。残差处理先用同组其他品种构造等权共同因子。若分组 \(g\) 内有 \(N_g\) 个品种，则品种 \(i\) 的组内共同因子为：
+
+\[
+f_{i,t}
+=
+\frac{1}{N_g-1}
+\sum_{\substack{j \in g \\ j \ne i}} r_{j,t}
+\]
+
+随后对每个品种做一元线性回归：
+
+\[
+r_{i,t}=\alpha_i+\beta_i f_{i,t}+\varepsilon_{i,t}
+\]
+
+代码中 \(\beta_i\) 和 \(\alpha_i\) 由协方差公式估计：
+
+\[
+\beta_i=\frac{\text{Cov}(r_i,f_i)}{\text{Var}(f_i)},\quad
+\alpha_i=\bar r_i-\beta_i \bar f_i
+\]
+
+残差为：
+
+\[
+\varepsilon_{i,t}=r_{i,t}-\alpha_i-\beta_i f_{i,t}
+\]
+
+然后在残差矩阵上重复同步相关与滞后领先计算：
+
+\[
+\rho_{\varepsilon,i \rightarrow j}^{(k)}
+=
+\text{corr}(\varepsilon_{i,t}, \varepsilon_{j,t+k})
+\]
+
+\[
+\text{residual\_lead\_edge}_{i \rightarrow j}^{(k)}
+=
+\rho_{\varepsilon,i \rightarrow j}^{(k)}
+-
+\rho_{\varepsilon,j \rightarrow i}^{(k)}
+\]
+
+筛选规则与普通滞后领先相同，即残差滞后相关绝对值不低于 0.05，且残差方向优势不低于 0.05。
 
 残差处理的逻辑是：对每个品种，用“组内其他品种收益均值”作为共同因子，计算剥离共同因子后的残差，再做同步相关和滞后领先。
 
@@ -268,6 +402,63 @@
 
 ## 7. 滚动相关结果
 
+本节对应 `rolling_corr_by_group.py`。滚动窗口为 \(w \in \{20,60,120\}\)，滞后为 \(k \in \{1,2,3,5\}\)。
+
+滚动同步相关为：
+
+\[
+\rho_{ij,t}^{(w)}
+=
+\text{corr}\left(
+\{r_{i,\tau}\}_{\tau=t-w+1}^{t},
+\{r_{j,\tau}\}_{\tau=t-w+1}^{t}
+\right)
+\]
+
+滚动领先相关为：
+
+\[
+\rho_{i \rightarrow j,t}^{(w,k)}
+=
+\text{corr}\left(
+\{r_{i,\tau}\}_{\tau=t-w+1}^{t},
+\{r_{j,\tau+k}\}_{\tau=t-w+1}^{t}
+\right)
+\]
+
+反向滚动领先相关为：
+
+\[
+\rho_{j \rightarrow i,t}^{(w,k)}
+=
+\text{corr}\left(
+\{r_{j,\tau}\}_{\tau=t-w+1}^{t},
+\{r_{i,\tau+k}\}_{\tau=t-w+1}^{t}
+\right)
+\]
+
+方向强度定义为：
+
+\[
+\text{lead\_strength}_{i \rightarrow j,t}^{(w,k)}
+=
+\rho_{i \rightarrow j,t}^{(w,k)}
+-
+\rho_{j \rightarrow i,t}^{(w,k)}
+\]
+
+综合得分中使用的滚动稳定性，是所有窗口、滞后、日期组合里方向强度为正的比例：
+
+\[
+\text{rolling\_stability}_{i \rightarrow j}
+=
+\frac{1}{M}
+\sum_{w,k,t}
+\mathbf{1}\{\text{lead\_strength}_{i \rightarrow j,t}^{(w,k)} > 0\}
+\]
+
+其中 \(M\) 是该方向有效滚动观测数。这个指标强调“方向出现得是否稳定”，不是平均收益或交易胜率。
+
 滚动相关使用 20/60/120 日窗口。
 
 滚动同步相关中，长期稳定高相关的品种对和静态相关基本一致：
@@ -307,6 +498,46 @@
 
 ### 8.1 Granger
 
+本小节对应 `granger_by_group.py`。以方向 \(i \rightarrow j\) 为例，Granger 检验的核心回归是：
+
+\[
+r_{j,t}
+=
+c
++
+\sum_{\ell=1}^{k} a_{\ell} r_{j,t-\ell}
++
+\sum_{\ell=1}^{k} b_{\ell} r_{i,t-\ell}
++
+u_t
+\]
+
+原假设为品种 \(i\) 不 Granger 导致品种 \(j\)：
+
+\[
+H_0: b_1=b_2=\cdots=b_k=0
+\]
+
+代码使用 `ssr_ftest` 的 p 值，并按：
+
+\[
+p < 0.05
+\Rightarrow
+\text{is\_granger\_significant}=\text{True}
+\]
+
+判定显著性。综合得分中还会把最小 p 值映射成分段分数：
+
+\[
+\text{granger\_score}(p)=
+\begin{cases}
+1.0, & p < 0.01 \\
+0.7, & 0.01 \le p < 0.05 \\
+0.4, & 0.05 \le p < 0.10 \\
+0, & p \ge 0.10
+\end{cases}
+\]
+
 Granger 检验结果：
 
 | 指标 | 数值 |
@@ -344,6 +575,50 @@ Granger 结果有明显可用性，但要注意多重检验。728 次检验在 `
 
 ### 8.2 VAR
 
+本小节对应 `var_by_group.py`。对每个分组拟合 VAR 模型，滞后阶数 \(p \in \{1,2,3,5\}\)。设组内收益率向量为：
+
+\[
+\mathbf{r}_t=(r_{1,t}, r_{2,t}, \dots, r_{N_g,t})^\top
+\]
+
+VAR 模型为：
+
+\[
+\mathbf{r}_t
+=
+\mathbf{c}
++
+\sum_{\ell=1}^{p}
+A_{\ell}\mathbf{r}_{t-\ell}
++
+\mathbf{u}_t
+\]
+
+对方向 \(i \rightarrow j\)，关注的是 \(A_{\ell}\) 中“品种 \(i\) 的滞后收益解释品种 \(j\) 当前收益”的系数：
+
+\[
+A_{\ell}[j,i]
+\]
+
+显著性规则为：
+
+\[
+p_{VAR} < 0.05
+\Rightarrow
+\text{is\_var\_significant}=\text{True}
+\]
+
+综合得分中 VAR 分数为：
+
+\[
+\text{var\_score}=
+\begin{cases}
+1.0, & p_{VAR}<0.05 \text{ 且 } A_{\ell}[j,i] > 0 \\
+0.5, & p_{VAR}<0.05 \text{ 且 } A_{\ell}[j,i] < 0 \\
+0, & \text{其他情况}
+\end{cases}
+\]
+
 VAR 结果：
 
 | 指标 | 数值 |
@@ -373,6 +648,30 @@ VAR p 值最低的非自身方向：
 VAR 的优点是同时控制同组其他变量，缺点是短样本新品种和多变量缺失会压缩有效样本。报告中应优先采用“VAR 与其他方法同向”的组合。
 
 ## 9. 综合领先得分
+
+本节对应 `leading_score_by_group.py`。综合得分先按方向合并滞后相关、残差领先、滚动稳定性、Granger 和 VAR。对连续型指标使用标准化：
+
+\[
+z(x)=\frac{x-\mu_x}{\sigma_x}
+\]
+
+若某列标准差为 0，则标准化后全为 0。最终得分公式为：
+
+\[
+\text{score}_{i \rightarrow j}
+=
+0.25 \cdot z(\text{lag\_diff})
++
+0.20 \cdot z(\text{residual\_lead\_edge})
++
+0.20 \cdot z(\text{rolling\_stability})
++
+0.20 \cdot \text{granger\_score}
++
+0.15 \cdot \text{var\_score}
+\]
+
+没有进入滞后或残差筛选的方向，对应字段填 0。这个分数是研究排序指标，不是收益预测值，也不是交易胜率。
 
 `leading_scores.csv` 有 182 个方向对。得分分布：
 
