@@ -106,6 +106,8 @@ r[i,t] = C[i,t] / C[i,t-1] - 1
 
 因此，后续所有相关、领先、Granger 和 VAR 统计都基于日收益率矩阵，而不是分钟级原始数据。
 
+![日收益率样本覆盖：各板块记录数](figures/data_coverage_by_group.png)
+
 ### 3.1 数据覆盖
 
 | 指标 | 数值 |
@@ -201,6 +203,8 @@ rho[i,j] = corr(r[i,t], r[j,t])
 
 这个指标衡量两个品种是否同涨同跌，不包含领先方向。相关系数越接近 1，同向同步性越强；越接近 -1，反向同步性越强。
 
+![同步相关最高的组内品种对 Top 20](figures/same_time_corr_top20.png)
+
 静态同日相关一共覆盖 91 个组内无向品种对，整体分布如下：
 
 | 指标 | 数值 |
@@ -275,6 +279,8 @@ lead_edge[i -> j, k] >= 0.05
 
 因此，进入 `lead_edges.csv` 的方向需要同时满足“自身滞后相关不太弱”和“相对反方向有明显优势”。
 
+![滞后领先优势 Top 20](figures/lag_lead_edges_top20.png)
+
 `lag_corr_by_group/lead_edges.csv` 使用阈值 `abs(lag_corr) >= 0.05` 且 `lead_edge >= 0.05` 筛选，最终得到 27 条方向性边。
 
 | lag | 边数 |
@@ -338,6 +344,8 @@ residual_lead_edge[i -> j, k]
 ```
 
 筛选规则与普通滞后领先相同，即残差滞后相关绝对值不低于 0.05，且残差方向优势不低于 0.05。
+
+![残差领先优势 Top 20](figures/residual_lead_edges_top20.png)
 
 残差处理的逻辑是：对每个品种，用“组内其他品种收益均值”作为共同因子，计算剥离共同因子后的残差，再做同步相关和滞后领先。
 
@@ -421,6 +429,8 @@ rolling_stability[i -> j]
 
 其中 `M` 是该方向有效滚动观测数。这个指标强调“方向出现得是否稳定”，不是平均收益或交易胜率。
 
+![滚动领先方向稳定性 Top 20](figures/rolling_stability_top20.png)
+
 滚动相关使用 20/60/120 日窗口。
 
 滚动同步相关中，长期稳定高相关的品种对和静态相关基本一致：
@@ -491,6 +501,8 @@ granger_score(p) =
   0.4, if 0.05 <= p < 0.10
   0.0, if p >= 0.10
 ```
+
+![Granger 显著检验数量：按板块](figures/granger_significant_by_sector.png)
 
 Granger 检验结果：
 
@@ -565,6 +577,8 @@ var_score =
   0.0, otherwise
 ```
 
+![VAR 显著非自身系数数量：按板块](figures/var_significant_by_sector.png)
+
 VAR 结果：
 
 | 指标 | 数值 |
@@ -613,6 +627,8 @@ score[i -> j]
 ```
 
 没有进入滞后或残差筛选的方向，对应字段填 0。这个分数是研究排序指标，不是收益预测值，也不是交易胜率。
+
+![综合领先得分 Top 25](figures/leading_scores_top25.png)
 
 `leading_scores.csv` 有 182 个方向对。得分分布：
 
