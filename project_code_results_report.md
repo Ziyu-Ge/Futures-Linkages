@@ -54,7 +54,7 @@
 
 本节对应 `instrument_corr_by_group.py`。对每个分组 `g`，先把日收益率转成矩阵：
 
-```text
+```latex
 R_g[t,i] = r[i,t]
 ```
 
