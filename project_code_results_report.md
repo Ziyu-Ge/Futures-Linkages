@@ -159,7 +159,7 @@ $$
 随后对每个品种做一元线性回归：
 
 $$
-r_{i,t} = \alpha_i + \beta_i\,\mathrm{factor}_{i,t} + \varepsilon_{i,t}
+r_{i,t} = \alpha_i + \beta_i\*\mathrm{factor}_{i,t} + \varepsilon_{i,t}
 $$
 
 代码中 $\beta_i$ 和 $\alpha_i$ 由协方差公式估计：
@@ -174,7 +174,7 @@ $$
 残差为：
 
 $$
-\varepsilon_{i,t}=r_{i,t}-\alpha_i-\beta_i\,\mathrm{factor}_{i,t}
+\varepsilon_{i,t}=r_{i,t}-\alpha_i-\beta_i\*\mathrm{factor}_{i,t}
 $$
 
 然后在残差矩阵上重复同步相关与滞后领先计算：
