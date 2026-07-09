@@ -11,9 +11,9 @@
 
 | 方法 | 口径 |
 | --- | --- |
-| 滞后相关 | $\mathrm{corr}(\mathrm{leader}_t,\mathrm{follower}_{t+\ell})$ 与反方向差值 $\mathrm{lead\_edge}$ |
+| 滞后相关 | $\mathrm{corr}(\mathrm{leader}_t,\mathrm{follower}_{t+\ell})$ 与反方向差值 $\mathrm{leadEdge}$ |
 | 残差滞后相关 | 先用组内其他品种均值作为因子剥离共同波动，再重复滞后相关 |
-| 滚动领先 | 在 20/60/120 日窗口中计算方向差 $\mathrm{lead\_strength}=\mathrm{lead}-\mathrm{reverse}$ |
+| 滚动领先 | 在 20/60/120 日窗口中计算方向差 $\mathrm{leadStrength}=\mathrm{lead}-\mathrm{reverse}$ |
 | Granger | 检验 leader 的滞后项是否帮助解释 follower |
 | VAR | 组内多变量 VAR 中，leader 滞后项对 follower 方程的系数和 p 值 |
 | 综合得分 | 对若干指标标准化或打分后加权合成 |
@@ -131,7 +131,7 @@ $$
 方向优势定义为两者之差：
 
 $$
-\mathrm{lead\_edge}(i \to j,k)
+\mathrm{leadEdge}(i \to j,k)
 = \rho_{\mathrm{lag}}(i \to j,k) - \rho_{\mathrm{lag}}(j \to i,k)
 $$
 
@@ -140,13 +140,13 @@ $$
 $$
 \begin{aligned}
 \left|\rho_{\mathrm{lag}}(i \to j,k)\right| &\ge 0.05,\\
-\mathrm{lead\_edge}(i \to j,k) &\ge 0.05
+\mathrm{leadEdge}(i \to j,k) &\ge 0.05
 \end{aligned}
 $$
 
 因此，进入 `lead_edges.csv` 的方向需要同时满足“自身滞后相关不太弱”和“相对反方向有明显优势”。
 
-`lag_corr_by_group/lead_edges.csv` 使用阈值 $\left|\mathrm{lag\_corr}\right| \ge 0.05$ 且 $\mathrm{lead\_edge} \ge 0.05$ 筛选，最终得到 27 条方向性边。
+`lag_corr_by_group/lead_edges.csv` 使用阈值 $\left|\mathrm{lagCorr}\right| \ge 0.05$ 且 $\mathrm{leadEdge} \ge 0.05$ 筛选，最终得到 27 条方向性边。
 
 | lag | 边数 |
 | ---: | ---: |
@@ -208,7 +208,7 @@ $$
 \begin{aligned}
 \rho_{\mathrm{resid}}(i \to j,k)
 &= \mathrm{corr}(\varepsilon_{i,t},\varepsilon_{j,t+k}) \\
-\mathrm{residual\_lead\_edge}(i \to j,k)
+\mathrm{residualLeadEdge}(i \to j,k)
 &= \rho_{\mathrm{resid}}(i \to j,k) - \rho_{\mathrm{resid}}(j \to i,k)
 \end{aligned}
 $$
@@ -259,7 +259,7 @@ $$
 滚动同步相关为：
 
 $$
-\mathrm{rolling\_corr}_{i,j,t,w}
+\mathrm{rollingCorr}_{i,j,t,w}
 = \mathrm{corr}\left(
 \{r_{i,\tau}\}_{\tau=t-w+1}^{t},
 \{r_{j,\tau}\}_{\tau=t-w+1}^{t}
@@ -269,7 +269,7 @@ $$
 滚动领先相关为：
 
 $$
-\mathrm{rolling\_lead\_corr}_{i\to j,t,w,k}
+\mathrm{rollingLeadCorr}_{i\to j,t,w,k}
 = \mathrm{corr}\left(
 \{r_{i,\tau}\}_{\tau=t-w+1}^{t},
 \{r_{j,\tau+k}\}_{\tau=t-w+1}^{t}
@@ -279,7 +279,7 @@ $$
 反向滚动领先相关为：
 
 $$
-\mathrm{rolling\_lead\_corr}_{j\to i,t,w,k}
+\mathrm{rollingLeadCorr}_{j\to i,t,w,k}
 = \mathrm{corr}\left(
 \{r_{j,\tau}\}_{\tau=t-w+1}^{t},
 \{r_{i,\tau+k}\}_{\tau=t-w+1}^{t}
@@ -289,16 +289,16 @@ $$
 方向强度定义为：
 
 $$
-\mathrm{lead\_strength}(i \to j,t,w,k)
-= \mathrm{rolling\_lead\_corr}_{i\to j,t,w,k}
-- \mathrm{rolling\_lead\_corr}_{j\to i,t,w,k}
+\mathrm{leadStrength}(i \to j,t,w,k)
+= \mathrm{rollingLeadCorr}_{i\to j,t,w,k}
+- \mathrm{rollingLeadCorr}_{j\to i,t,w,k}
 $$
 
 综合得分中使用的滚动稳定性，是所有窗口、滞后、日期组合里方向强度为正的比例：
 
 $$
-\mathrm{rolling\_stability}(i \to j)
-= \frac{\mathrm{count}\{(t,w,k):\mathrm{lead\_strength}(i \to j,t,w,k)>0\}}{M}
+\mathrm{rollingStability}(i \to j)
+= \frac{\mathrm{count}\{(t,w,k):\mathrm{leadStrength}(i \to j,t,w,k)>0\}}{M}
 $$
 
 其中 $M$ 是该方向有效滚动观测数。这个指标强调“方向出现得是否稳定”，不是平均收益或交易胜率。
@@ -360,13 +360,13 @@ $$
 代码使用 `ssr_ftest` 的 p 值，并按：
 
 $$
-p < 0.05 \Rightarrow \mathrm{is\_granger\_significant}=\mathrm{True}
+p < 0.05 \Rightarrow \mathrm{isGrangerSignificant}=\mathrm{True}
 $$
 
 判定显著性。综合得分中还会把最小 p 值映射成分段分数：
 
 $$
-\mathrm{granger\_score}(p)=
+\mathrm{grangerScore}(p)=
 \begin{cases}
 1.0, & p < 0.01 \\
 0.7, & 0.01 \le p < 0.05 \\
@@ -434,13 +434,13 @@ $$
 显著性规则为：
 
 $$
-p_{\mathrm{VAR}} < 0.05 \Rightarrow \mathrm{is\_var\_significant}=\mathrm{True}
+p_{\mathrm{VAR}} < 0.05 \Rightarrow \mathrm{isVarSignificant}=\mathrm{True}
 $$
 
 综合得分中 VAR 分数为：
 
 $$
-\mathrm{var\_score}=
+\mathrm{varScore}=
 \begin{cases}
 1.0, & p_{\mathrm{VAR}} < 0.05,\ (A_\ell)_{j,i} > 0 \\
 0.5, & p_{\mathrm{VAR}} < 0.05,\ (A_\ell)_{j,i} < 0 \\
@@ -489,11 +489,11 @@ $$
 $$
 \begin{aligned}
 \mathrm{score}(i \to j)
-&= 0.25\,z(\mathrm{lag\_diff})
-+ 0.20\,z(\mathrm{residual\_lead\_edge}) \\
-&\quad + 0.20\,z(\mathrm{rolling\_stability})
-+ 0.20\,\mathrm{granger\_score}
-+ 0.15\,\mathrm{var\_score}
+&= 0.25\,z(\mathrm{lagDiff})
++ 0.20\,z(\mathrm{residualLeadEdge}) \\
+&\quad + 0.20\,z(\mathrm{rollingStability})
++ 0.20\,\mathrm{grangerScore}
++ 0.15\,\mathrm{varScore}
 \end{aligned}
 $$
 
