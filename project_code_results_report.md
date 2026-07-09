@@ -521,6 +521,24 @@ $$
 | 24 | 煤化工建材 | `MA -> SA` | 0.771 | 2 | 0.053 | 0.000 | 0.535 | 0.00288 | 0.00432 |
 | 25 | 有色基本金属 | `CU -> AO` | 0.701 | NA | 0.000 | 0.058 | 0.630 | 0.20116 | 0.01695 |
 
+![价格图1](figures/price_compare_by_sector/新能源材料.png)
+
+![价格图2](figures/price_compare_by_sector/聚酯产业链.png)
+
+![价格图3](figures/price_compare_by_sector/金融期货.png)
+
+![价格图4](figures/price_compare_by_sector/有色基本金属.png)
+
+![价格图5](figures/price_compare_by_sector/烯烃塑料.png)
+
+![价格图6](figures/price_compare_by_sector/煤化工建材.png)
+
+![价格图7](figures/price_compare_by_sector/畜禽.png)
+
+![价格图8](figures/price_compare_by_sector/能源油品.png)
+
+![价格图9](figures/price_compare_by_sector/贵金属.png)
+
 每个分组的最高得分方向：
 
 | 分组 | 领先 -> 跟随 | score |
