@@ -264,9 +264,7 @@ $$
 方向强度定义为：
 
 $$
-\mathrm{leadStrength}(i \to j,t,w,k)
-= \mathrm{rollingLeadCorr}_{i\to j,t,w,k}
-- \mathrm{rollingLeadCorr}_{j\to i,t,w,k}
+\mathrm{leadStrength}(i \to j,t,w,k) = \mathrm{rollingLeadCorr}_{i\to j,t,w,k} - \mathrm{rollingLeadCorr}_{j\to i,t,w,k}
 $$
 
 综合得分中使用的滚动稳定性，是所有窗口、滞后、日期组合里方向强度为正的比例：
