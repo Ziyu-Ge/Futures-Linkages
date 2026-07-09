@@ -106,8 +106,6 @@ r[i,t] = C[i,t] / C[i,t-1] - 1
 
 因此，后续所有相关、领先、Granger 和 VAR 统计都基于日收益率矩阵，而不是分钟级原始数据。
 
-![日收益率样本覆盖：各板块记录数](figures/data_coverage_by_group.png)
-
 ### 3.1 数据覆盖
 
 | 指标 | 数值 |
@@ -502,8 +500,6 @@ granger_score(p) =
   0.0, if p >= 0.10
 ```
 
-![Granger 显著检验数量：按板块](figures/granger_significant_by_sector.png)
-
 Granger 检验结果：
 
 | 指标 | 数值 |
@@ -576,8 +572,6 @@ var_score =
   0.5, if p_VAR < 0.05 and A[ell][j,i] < 0
   0.0, otherwise
 ```
-
-![VAR 显著非自身系数数量：按板块](figures/var_significant_by_sector.png)
 
 VAR 结果：
 
