@@ -315,7 +315,7 @@ $$
 
 ### 6.1 Granger
 
-本小节对应 `granger_by_group.py`。以方向 $i \to j$ 为例，Granger 检验的核心回归是：
+解释 i 过去几天的收益率，能不能帮助预测 j 今天的收益率，看 i 对 j 是否有额外预测力。本小节对应 `granger_by_group.py`。以方向 $i \to j$ 为例，Granger 检验的核心回归是：
 
 $$
 r_{j,t} = c + \sum_{\ell=1}^{k} a_\ell r_{j,t-\ell} + \sum_{\ell=1}^{k} b_\ell r_{i,t-\ell} + u_t
@@ -378,27 +378,39 @@ Granger 检验结果：
 | 聚酯产业链 | `PR -> EG` | 5 | 1.22e-04 |
 | 金融期货 | `IF -> IM` | 2 | 1.82e-04 |
 
-Granger 结果有明显可用性，但要注意多重检验。728 次检验在 $\alpha=0.05$ 下即使完全无效也期望约 36 个假阳性；当前有 174 个显著，说明信号密度高于纯噪声，但仍需要做 FDR/Bonferroni 或样本外验证。
 
 ### 6.2 VAR
 
-本小节对应 `var_by_group.py`。对每个分组拟合 VAR 模型，滞后阶数 $p \in \{1,2,3,5\}$。设组内收益率向量为：
+把同一分组里的所有品种放在一个系统里，看“谁过去的收益能解释谁今天的收益”。本小节对应 `var_by_group.py`。对每个分组拟合 VAR 模型，滞后阶数 $p \in \{1,2,3,5\}$。设组内收益率向量为：
 
 $$
 \mathbf{r}_t = [r_{1,t}, r_{2,t}, \ldots, r_{N_g,t}]^\top
 $$
 
-VAR 模型为：
+VAR 模型为：（今天这一组品种的收益率 = 常数 + 过去几天这一组品种收益率的影响 + 误差）
 
 $$
 \mathbf{r}_t
 = \mathbf{c} + \sum_{\ell=1}^{p} A_\ell \mathbf{r}_{t-\ell} + \mathbf{u}_t
 $$
 
+比如滞后阶数 p = 1，模型大概就是：
+
+LC今天 = 常数 + LC昨天 + PS昨天 + SI昨天 + 误差
+
+PS今天 = 常数 + LC昨天 + PS昨天 + SI昨天 + 误差
+
+SI今天 = 常数 + LC昨天 + PS昨天 + SI昨天 + 误差
+
 对方向 $i \to j$，关注的是 $A_\ell$ 中“品种 $i$ 的滞后收益解释品种 $j$ 当前收益”的系数：
 
 $$
 (A_\ell)_{j,i}
+$$
+
+也就是这一项的系数：
+$$
+r_{j,t} = \cdots + b \cdot r_{i,t-\ell} + \cdots
 $$
 
 显著性规则为：
@@ -429,6 +441,9 @@ VAR 结果：
 
 VAR p 值最低的非自身方向：
 
+model_lag 是这个 VAR 模型总共用了过去几天的数据；
+predictor_lag 是当前这一行系数具体对应过去第几天。
+
 | 分组 | model_lag | predictor_lag | 领先 -> 跟随 | 系数 | p_value |
 | --- | ---: | ---: | --- | ---: | ---: |
 | 烯烃塑料 | 5 | 4 | `EB -> PP` | 0.506 | 2.57e-07 |
@@ -458,12 +473,7 @@ $$
 
 $$
 \begin{aligned}
-\mathrm{score}(i \to j)
-&= 0.25\,z(\mathrm{lagDiff})
-+ 0.20\,z(\mathrm{residualLeadEdge}) \\
-&\quad + 0.20\,z(\mathrm{rollingStability})
-+ 0.20\,\mathrm{grangerScore}
-+ 0.15\,\mathrm{varScore}
+\mathrm{score}(i \to j) &= 0.25\,z(\mathrm{lagDiff}) + 0.20\,z(\mathrm{residualLeadEdge}) \\ &\quad + 0.20\,z(\mathrm{rollingStability}) + 0.20\,\mathrm{grangerScore} + 0.15\,\mathrm{varScore} 
 \end{aligned}
 $$
 
