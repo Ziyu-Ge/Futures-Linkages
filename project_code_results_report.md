@@ -318,10 +318,7 @@ $$
 本小节对应 `granger_by_group.py`。以方向 $i \to j$ 为例，Granger 检验的核心回归是：
 
 $$
-r_{j,t}
-= c + \sum_{\ell=1}^{k} a_\ell r_{j,t-\ell}
-+ \sum_{\ell=1}^{k} b_\ell r_{i,t-\ell}
-+ u_t
+r_{j,t} = c + \sum_{\ell=1}^{k} a_\ell r_{j,t-\ell} + \sum_{\ell=1}^{k} b_\ell r_{i,t-\ell} + u_t
 $$
 
 原假设为品种 `i` 不 Granger 导致品种 `j`：
