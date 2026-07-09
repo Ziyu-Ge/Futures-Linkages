@@ -3,32 +3,7 @@
 生成日期：2026-07-03  
 阅读范围：`code/*.py` 全部 8 个脚本、`data/*.csv` 输入数据概况、`results/processed/` 下全部结果 CSV。
 
-## 1 定义与数据处理
-
-### 1.1 领先关系定义
-
-项目里有几种“领先”的定义：
-
-| 方法 | 口径 |
-| --- | --- |
-| 滞后相关 | $\mathrm{corr}(\mathrm{leader}_t,\mathrm{follower}_{t+\ell})$ 与反方向差值 $\mathrm{leadEdge}$ |
-| 残差滞后相关 | 先用组内其他品种均值作为因子剥离共同波动，再重复滞后相关 |
-| 滚动领先 | 在 20/60/120 日窗口中计算方向差 $\mathrm{leadStrength}=\mathrm{lead}-\mathrm{reverse}$ |
-| Granger | 检验 leader 的滞后项是否帮助解释 follower |
-| VAR | 组内多变量 VAR 中，leader 滞后项对 follower 方程的系数和 p 值 |
-| 综合得分 | 对若干指标标准化或打分后加权合成 |
-
-综合得分权重：
-
-| 组件 | 权重 |
-| --- | ---: |
-| 滞后相关差 `lag_diff` | 0.25 |
-| 残差领先差 `residual_lead_edge` | 0.20 |
-| 滚动方向稳定性 `rolling_stability` | 0.20 |
-| Granger 分数 | 0.20 |
-| VAR 分数 | 0.15 |
-
-### 1.2 分组
+## 1 分组
 
 | 分组 | 品种数 | 品种 |
 | --- | ---: | --- |
