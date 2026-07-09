@@ -409,6 +409,7 @@ $$
 $$
 
 也就是这一项的系数：
+
 $$
 r_{j,t} = \cdots + b \cdot r_{i,t-\ell} + \cdots
 $$
