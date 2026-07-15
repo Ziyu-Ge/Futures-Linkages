@@ -1,6 +1,6 @@
 # Local input data and generated outputs
 data/
-results/
+# results/
 figures/
 
 # Python caches and test artifacts
