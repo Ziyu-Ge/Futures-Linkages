@@ -352,4 +352,4 @@ sample_count >= 20
 
 ### 9.2 单次事件复盘图
 
-[打开可切换事件复盘页面](results/figures/event_review.html)
+[打开可切换事件复盘页面](https://github.com/Ziyu-Ge/Futures-Linkages/blob/main/results/figures/event_review.html)
