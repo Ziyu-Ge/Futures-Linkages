@@ -1,4 +1,4 @@
-"""逐品种读取分钟数据，并压缩为日线和小时状态。"""
+"""读取分钟行情，并生成日 K 与每小时可见的当下日 K。"""
 
 import gc
 from pathlib import Path
@@ -9,16 +9,16 @@ import pandas as pd
 from config import GROUP, HISTORY_DAYS, MINUTE_COLUMNS, NUMERIC_COLUMNS
 
 
-def safe_change(numerator, denominator):
-    """分母为 0 或任一值缺失时返回 NaN。"""
-    valid = numerator.notna() & denominator.notna() & denominator.ne(0)
-    result = pd.Series(np.nan, index=numerator.index, dtype="float64")
-    result.loc[valid] = numerator.loc[valid] / denominator.loc[valid] - 1.0
+def safe_pct_change(current, previous):
+    """计算 current / previous - 1，分母缺失或为 0 时返回 NaN。"""
+    valid = current.notna() & previous.notna() & previous.ne(0)
+    result = pd.Series(np.nan, index=current.index, dtype="float64")
+    result.loc[valid] = current.loc[valid] / previous.loc[valid] - 1.0
     return result.replace([np.inf, -np.inf], np.nan)
 
 
 def read_minutes(file):
-    """只读规则需要的列，并保证每个分钟时点唯一且有序。"""
+    """只读取规则需要的列，并按时间排序去重。"""
     header = pd.read_csv(file, nrows=0).columns
     missing = sorted(set(MINUTE_COLUMNS) - set(header))
     if missing:
@@ -29,22 +29,20 @@ def read_minutes(file):
         usecols=MINUTE_COLUMNS,
         dtype={column: "float64" for column in NUMERIC_COLUMNS},
         parse_dates=["datetime"],
-        date_format="mixed",
     )
-    df = df.dropna(subset=["datetime"])
-    df = df.sort_values("datetime", kind="mergesort")
+    df = df.dropna(subset=["datetime"]).sort_values("datetime", kind="mergesort")
     return df.drop_duplicates("datetime", keep="last").reset_index(drop=True)
 
 
 def assign_trade_date(df):
-    """夜盘映射到该品种下一个真实出现日盘的交易日。"""
+    """把夜盘映射到下一个真实日盘交易日，自动跨过周末和节假日。"""
     natural_date = df["datetime"].dt.normalize()
     day_mask = df["datetime"].dt.hour.between(8, 17)
     calendar = pd.DatetimeIndex(natural_date.loc[day_mask].drop_duplicates().sort_values())
     if calendar.empty:
         return pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
 
-    # 晚盘先指向次日，再向后找下一个真实日盘，自动跨周末/节假日。
+    # 18:00 之后视作夜盘，先指向下一自然日，再找下一个真实日盘日期。
     target = natural_date + pd.to_timedelta(
         df["datetime"].dt.hour.ge(18).astype("int8"), unit="D"
     )
@@ -55,122 +53,134 @@ def assign_trade_date(df):
     return trade_date
 
 
-def make_daily(df, symbol, group):
-    """按交易日合成完整日 K，并只用前 20 个完整日生成历史指标。"""
-    grouped = df.groupby("trade_date", sort=True, observed=True)
-    first = grouped.nth(0).set_index("trade_date")
-    last = grouped.nth(-1).set_index("trade_date")
-    daily = pd.DataFrame(index=first.index)
-    daily.index.name = "trade_date"
-    daily["day_start_time"] = first["datetime"]
-    daily["day_end_time"] = last["datetime"]
-    daily["day_open"] = first["open"]
-    daily["day_high"] = grouped["high"].max()
-    daily["day_low"] = grouped["low"].min()
-    daily["day_close"] = last["close"]
-    daily["day_oi_open"] = first["open_interest"]
-    daily["day_oi_close"] = last["open_interest"]
-    daily["daily_return"] = safe_change(daily["day_close"], daily["day_open"])
-    daily["daily_oi_change"] = safe_change(daily["day_oi_close"], daily["day_oi_open"])
+def add_history_factors(daily):
+    """用今天以前的完整日 K，计算前 20 日突破价和平均波动阈值。"""
+    daily = daily.sort_values("trade_date", kind="mergesort").copy()
+    daily["prev_close"] = daily["close"].shift(1)
+    daily["prev_open_interest"] = daily["open_interest"].shift(1)
+    daily["return"] = safe_pct_change(daily["close"], daily["prev_close"])
+    daily["oi_change"] = safe_pct_change(
+        daily["open_interest"], daily["prev_open_interest"]
+    )
 
     previous = daily.shift(1)
     rolling = previous.rolling(HISTORY_DAYS, min_periods=HISTORY_DAYS)
-    daily["prior_high"] = rolling["day_high"].max()
-    daily["prior_low"] = rolling["day_low"].min()
-    daily["avg_abs_return"] = rolling["daily_return"].apply(
+    daily["prior_20_high"] = rolling["high"].max()
+    daily["prior_20_low"] = rolling["low"].min()
+    daily["avg_abs_return_20"] = rolling["return"].apply(
         lambda values: np.abs(values).mean(), raw=True
     )
-    daily["avg_abs_oi_change"] = rolling["daily_oi_change"].apply(
+    daily["avg_abs_oi_change_20"] = rolling["oi_change"].apply(
         lambda values: np.abs(values).mean(), raw=True
     )
-    dates = daily.index.to_series()
-    daily["window_start"] = dates.shift(HISTORY_DAYS).to_numpy()
-    daily["window_end"] = dates.shift(1).to_numpy()
+    dates = daily["trade_date"]
+    daily["history_start"] = dates.shift(HISTORY_DAYS)
+    daily["history_end"] = dates.shift(1)
+    return daily
+
+
+def make_daily(df, symbol, group):
+    """把分钟数据合成完整交易日日 K。"""
+    grouped = df.groupby("trade_date", sort=True, observed=True)
+    first = grouped.nth(0).set_index("trade_date")
+    last = grouped.nth(-1).set_index("trade_date")
+
+    daily = pd.DataFrame(index=first.index)
+    daily.index.name = "trade_date"
+    daily["open"] = first["open"]
+    daily["high"] = grouped["high"].max()
+    daily["low"] = grouped["low"].min()
+    daily["close"] = last["close"]
+    daily["open_interest"] = last["open_interest"]
+    daily["day_start_time"] = first["datetime"]
+    daily["day_end_time"] = last["datetime"]
+    daily = add_history_factors(daily.reset_index())
     daily.insert(0, "group", group)
     daily.insert(0, "symbol", symbol)
-    return daily.reset_index()
+    return daily
 
 
-def first_breaks(df, daily):
-    """用分钟高低价记录每天首次严格突破的准确时间和价格。"""
-    indexed = daily.set_index("trade_date")
-    prior_high = df["trade_date"].map(indexed["prior_high"])
-    prior_low = df["trade_date"].map(indexed["prior_low"])
+def first_break_times(df, daily):
+    """记录每个交易日第一次突破前 20 日高低点的分钟时间。"""
+    history = daily.set_index("trade_date")
+    prior_high = df["trade_date"].map(history["prior_20_high"])
+    prior_low = df["trade_date"].map(history["prior_20_low"])
 
     up = df.loc[df["high"].gt(prior_high), ["trade_date", "datetime", "high"]]
     down = df.loc[df["low"].lt(prior_low), ["trade_date", "datetime", "low"]]
     up = up.drop_duplicates("trade_date", keep="first").set_index("trade_date")
     down = down.drop_duplicates("trade_date", keep="first").set_index("trade_date")
-    return (
-        up.rename(columns={"datetime": "up_break_time", "high": "up_break_price"}),
-        down.rename(columns={"datetime": "down_break_time", "low": "down_break_price"}),
-    )
+    up = up.rename(columns={"datetime": "up_break_time", "high": "up_break_price"})
+    down = down.rename(columns={"datetime": "down_break_time", "low": "down_break_price"})
+    return up, down
 
 
-def make_hours(df, daily, symbol, group):
-    """生成自然小时收盘收益率，以及每小时可见的当下日 K。"""
-    df["hour_key"] = df["datetime"].dt.floor("h")
-    grouped = df.groupby(["trade_date", "hour_key"], sort=True, observed=True)
+def make_hourly_snapshots(df, daily, symbol, group):
+    """生成每个自然小时收盘时，交易日内已经可见的当下日 K。"""
+    work = df.copy()
+    work["identify_hour"] = work["datetime"].dt.floor("h")
+    grouped = work.groupby(["trade_date", "identify_hour"], sort=True, observed=True)
     last = grouped.nth(-1).reset_index()
-    hours = grouped.agg(hour_high=("high", "max"), hour_low=("low", "min")).reset_index()
-    hours = hours.merge(
-        last[["trade_date", "hour_key", "datetime", "close", "open_interest"]],
-        on=["trade_date", "hour_key"],
+    hourly = grouped.agg(hour_high=("high", "max"), hour_low=("low", "min")).reset_index()
+    hourly = hourly.merge(
+        last[["trade_date", "identify_hour", "datetime", "close", "open_interest"]],
+        on=["trade_date", "identify_hour"],
         how="left",
         validate="one_to_one",
-    ).rename(columns={"datetime": "snapshot_time", "close": "hour_close"})
-    hours = hours.sort_values("hour_key", kind="mergesort").reset_index(drop=True)
-    hours["hour_return"] = hours["hour_close"].pct_change(fill_method=None)
-    hours["hour_return"] = hours["hour_return"].replace([np.inf, -np.inf], np.nan)
-    hours["next_hour_time"] = hours["snapshot_time"].shift(-1)
-    hours["next_hour_return"] = hours["hour_return"].shift(-1)
+    ).rename(columns={"datetime": "snapshot_time"})
 
-    # 当前日 K 只累计到该小时，绝不使用本小时之后的分钟。
-    by_day = hours.groupby("trade_date", sort=False, observed=True)
-    hours["current_high"] = by_day["hour_high"].cummax()
-    hours["current_low"] = by_day["hour_low"].cummin()
-    daily_columns = [
-        "trade_date", "day_open", "day_oi_open", "prior_high", "prior_low",
-        "avg_abs_return", "avg_abs_oi_change", "window_start", "window_end",
+    # 当前未完成日 K：只累计到本小时，不使用本小时之后的分钟。
+    by_day = hourly.groupby("trade_date", sort=False, observed=True)
+    hourly["high"] = by_day["hour_high"].cummax()
+    hourly["low"] = by_day["hour_low"].cummin()
+
+    daily_cols = [
+        "trade_date", "open", "prev_close", "prev_open_interest", "prior_20_high",
+        "prior_20_low", "avg_abs_return_20", "avg_abs_oi_change_20",
+        "history_start", "history_end",
     ]
-    hours = hours.merge(daily[daily_columns], on="trade_date", how="left", validate="many_to_one")
-    hours["current_return"] = safe_change(hours["hour_close"], hours["day_open"])
-    hours["current_oi_change"] = safe_change(hours["open_interest"], hours["day_oi_open"])
-    up, down = first_breaks(df, daily)
-    hours = hours.merge(up, on="trade_date", how="left").merge(down, on="trade_date", how="left")
-    hours.insert(0, "group", group)
-    hours.insert(0, "symbol", symbol)
-    return hours
+    hourly = hourly.merge(
+        daily[daily_cols], on="trade_date", how="left", validate="many_to_one"
+    )
+    hourly["return"] = safe_pct_change(hourly["close"], hourly["prev_close"])
+    hourly["oi_change"] = safe_pct_change(
+        hourly["open_interest"], hourly["prev_open_interest"]
+    )
+
+    up, down = first_break_times(df, daily)
+    hourly = hourly.merge(up, on="trade_date", how="left")
+    hourly = hourly.merge(down, on="trade_date", how="left")
+    hourly.insert(0, "group", group)
+    hourly.insert(0, "symbol", symbol)
+    return hourly
 
 
 def prepare_symbol(file):
+    """读取单个品种，返回完整日 K 和每小时当前日 K。"""
     symbol = file.stem.upper()
     group = GROUP.get(symbol, "未分类")
-    df = read_minutes(file)
-    df["trade_date"] = assign_trade_date(df)
-    df = df.dropna(subset=["trade_date"])
-    daily = make_daily(df, symbol, group)
-    hours = make_hours(df, daily, symbol, group)
-    return daily, hours
+    minutes = read_minutes(file)
+    minutes["trade_date"] = assign_trade_date(minutes)
+    minutes = minutes.dropna(subset=["trade_date"])
+    daily = make_daily(minutes, symbol, group)
+    hourly = make_hourly_snapshots(minutes, daily, symbol, group)
+    return daily, hourly
 
 
-def prepare_all(data_dir):
-    """所有分钟文件逐个处理；内存中只长期保留压缩后的表。"""
+def prepare_all(data_dir, symbols=None):
+    """逐品种处理数据，避免一次性把 4GB 分钟数据放进内存。"""
+    wanted = {symbol.upper() for symbol in symbols} if symbols else None
     files = sorted(Path(data_dir).glob("*.csv"))
+    if wanted:
+        files = [file for file in files if file.stem.upper() in wanted]
     if not files:
-        raise FileNotFoundError(f"{data_dir} 中没有 CSV 数据")
-    daily_parts, snapshot_parts, hourly_by_symbol = [], [], {}
+        raise FileNotFoundError(f"{data_dir} 中没有可处理的 CSV 文件")
+
+    daily_parts, snapshot_parts = [], []
     for number, file in enumerate(files, start=1):
-        daily, hours = prepare_symbol(file)
+        daily, hourly = prepare_symbol(file)
         daily_parts.append(daily)
-        # 下一小时字段只放辅助验证查找表，不进入历史截面。
-        snapshot_parts.append(hours.drop(columns=["next_hour_time", "next_hour_return"]))
-        hourly_by_symbol[file.stem.upper()] = hours[[
-            "trade_date", "hour_key", "snapshot_time", "hour_return",
-            "next_hour_time", "next_hour_return",
-        ]].copy()
+        snapshot_parts.append(hourly)
         print(f"预处理 {number:02d}/{len(files):02d}: {file.stem.upper()}", flush=True)
         gc.collect()
-    daily_all = pd.concat(daily_parts, ignore_index=True)
-    snapshots = pd.concat(snapshot_parts, ignore_index=True)
-    return daily_all, snapshots, hourly_by_symbol
+    return pd.concat(daily_parts, ignore_index=True), pd.concat(snapshot_parts, ignore_index=True)
