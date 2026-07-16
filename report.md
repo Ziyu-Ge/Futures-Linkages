@@ -342,3 +342,14 @@ sample_count >= 20
 最终逻辑是：
 
 > 先在每个板块里找“最早、最强、带持仓变化”的突破品种作为龙头，再找“同板块、同方向、历史走势相似”的品种作为跟随。
+
+
+## 9.结果
+
+### 9.1 龙头-跟随网络图
+
+![龙头-跟随网络图](results/figures/leader_follower_network.png)
+
+### 9.2 单次事件复盘图
+
+[打开可切换事件复盘页面](results/figures/event_review.html)
