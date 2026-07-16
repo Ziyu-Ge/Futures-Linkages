@@ -1,12 +1,13 @@
 # Local input data and generated outputs
 data/
 # results/
-figures/
+# figures/
 
 # Python caches and test artifacts
 __pycache__/
 *.py[cod]
 .pytest_cache/
+results/.matplotlib-cache
 
 # macOS metadata
 .DS_Store
