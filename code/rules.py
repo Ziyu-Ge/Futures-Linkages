@@ -36,9 +36,11 @@ def make_leader_reason(row, direction):
         oi_text = "减仓"
     return (
         f"{break_text}；涨跌幅={row['return']:.4%}，"
-        f"超过2倍前20日平均绝对涨跌幅 {row['avg_abs_return_20']:.4%}；"
+        f"超过{RETURN_MULTIPLIER:g}倍前20日平均绝对涨跌幅 "
+        f"{row['avg_abs_return_20']:.4%}；"
         f"{oi_text}幅度={row['oi_change']:.4%}，"
-        f"超过1.5倍前20日平均绝对增减仓幅度 {row['avg_abs_oi_change_20']:.4%}；"
+        f"超过{OI_MULTIPLIER:g}倍前20日平均绝对增减仓幅度 "
+        f"{row['avg_abs_oi_change_20']:.4%}；"
         f"首次突破时间={row['first_break_time']}"
     )
 

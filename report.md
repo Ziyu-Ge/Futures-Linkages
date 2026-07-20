@@ -32,9 +32,9 @@
 | 参数 | 当前值 | 含义 |
 | --- | ---: | --- |
 | `HISTORY_DAYS` | 20 | 回看过去 20 个完整交易日。 |
-| `RETURN_MULTIPLIER` | 3.0 | 当前涨跌幅绝对值要超过历史平均绝对涨跌幅的 3 倍。 |
+| `RETURN_MULTIPLIER` | 4.0 | 当前涨跌幅绝对值要超过历史平均绝对涨跌幅的 4 倍。 |
 | `OI_MULTIPLIER` | 2.0 | 当前持仓变化绝对值要超过历史平均绝对持仓变化的 2 倍。 |
-| `CORRELATION_THRESHOLD` | 0.8 | 跟随品种和龙头的 20 日收益率相关系数至少为 0.8。 |
+| `CORRELATION_THRESHOLD` | 0.5 | 跟随品种和龙头的 20 日收益率相关系数至少为 0.5。 |
 | `MIN_CORRELATION_DAYS` | 20 | 相关性计算至少需要 20 个有效样本。 |
 
 ## 4. 龙头识别条件
@@ -47,7 +47,7 @@
 向上龙头 =
     突破前 20 日高点
     + 当前上涨
-    + 涨幅超过历史平均波动 3 倍
+    + 涨幅超过历史平均波动 4 倍
     + 当前增仓
     + 增仓幅度超过历史平均持仓变化 2 倍
 ```
@@ -94,7 +94,7 @@ mean(|return_{t-20}|, |return_{t-19}|, ..., |return_{t-1}|)
 ```
 
 ```text
-|return_{t,h}| > 3.0 * avg_abs_return_20_t
+|return_{t,h}| > 4.0 * avg_abs_return_20_t
 ```
 
 解释：
@@ -102,7 +102,7 @@ mean(|return_{t-20}|, |return_{t-19}|, ..., |return_{t-1}|)
 如果过去 20 天这个品种平均每天绝对涨跌幅是 1%，那么当前涨幅要大于：
 
 ```text
-3.0 * 1% = 3%
+4.0 * 1% = 4%
 ```
 
 这样才算“涨得足够异常”。
@@ -149,7 +149,7 @@ mean(|oi_change_{t-20}|, |oi_change_{t-19}|, ..., |oi_change_{t-1}|)
 向下龙头 =
     跌破前 20 日低点
     + 当前下跌
-    + 跌幅超过历史平均波动 3 倍
+    + 跌幅超过历史平均波动 4 倍
     + 当前减仓
     + 减仓幅度超过历史平均持仓变化 2 倍
 ```
@@ -240,7 +240,7 @@ sqrt(Σ(R_L,k - mean(R_L))^2 * Σ(R_j,k - mean(R_j))^2)
 当前代码要求：
 
 ```text
-corr(L, j) >= 0.8
+corr(L, j) >= 0.5
 ```
 
 ### 跟随品种一句话总结
@@ -249,7 +249,7 @@ corr(L, j) >= 0.8
 跟随品种 =
     和龙头同板块
     + 当前方向和龙头一致
-    + 过去 20 日收益率相关系数 >= 0.8
+    + 过去 20 日收益率相关系数 >= 0.5
     + 有 20 个有效相关性样本
 ```
 
@@ -318,14 +318,14 @@ results/identification/follower_results.csv
 向上龙头条件：
 high_{t,h} > prior_20_high_t
 return_{t,h} > 0
-|return_{t,h}| > 3.0 * avg_abs_return_20_t
+|return_{t,h}| > 4.0 * avg_abs_return_20_t
 oi_change_{t,h} > 0
 |oi_change_{t,h}| > 2.0 * avg_abs_oi_change_20_t
 
 向下龙头条件：
 low_{t,h} < prior_20_low_t
 return_{t,h} < 0
-|return_{t,h}| > 3.0 * avg_abs_return_20_t
+|return_{t,h}| > 4.0 * avg_abs_return_20_t
 oi_change_{t,h} < 0
 |oi_change_{t,h}| > 2.0 * avg_abs_oi_change_20_t
 ```
@@ -335,7 +335,7 @@ oi_change_{t,h} < 0
 ```text
 group_j = group_L
 direction_j = direction_L
-corr(return_L_last_20_days, return_j_last_20_days) >= 0.8
+corr(return_L_last_20_days, return_j_last_20_days) >= 0.5
 sample_count >= 20
 ```
 
