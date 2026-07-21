@@ -1,6 +1,9 @@
 # Local input data and generated outputs
 data/
 results/identification/
+results/long_backtest/
+results/short_backtest_fee_1bp/
+results/short_grid/
 # figures/
 
 # Python caches and test artifacts
