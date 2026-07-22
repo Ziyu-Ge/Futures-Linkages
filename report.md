@@ -376,27 +376,6 @@ python3 code/run_short_backtest.py
 5. 平空价格为完整日 K 的 `close`。
 6. 收益率按做空计算：
 
-```text
-税前收益率 = 开空价 / 平空价 - 1
-净收益率 = 税前收益率 - 2 * 单边费率
-```
-
-默认 `--fee-rate=0.0`，也就是不计手续费。
-
-回测输出目录：
-
-```text
-results/short_backtest/
-```
-
-输出文件：
-
-| 文件 | 含义 |
-| --- | --- |
-| `trades.csv` | 每笔交易明细，包括开空时间、开空价、平空时间、平空价、税前收益率和净收益率。 |
-| `daily_returns.csv` | 按交易日等权后的当日收益率、累计净值和回撤。 |
-| `metrics.csv` | 汇总绩效指标。 |
-
 当前 `results/short_backtest/metrics.csv` 中的结果为：
 
 | 指标 | 数值 |
@@ -408,80 +387,15 @@ results/short_backtest/
 | 最大回撤 | 0.28% |
 | 年化夏普比率 | 0.81 |
 
-## 9. 参数网格回测逻辑
+## 9. 可视化输出
 
-网格入口是：
-
-```bash
-python3 code/run_short_grid.py
-```
-
-默认三组参数：
-
-| 参数 | 网格范围 |
-| --- | --- |
-| `RETURN_MULTIPLIER` | 1.0 到 5.0，步长 0.5。 |
-| `OI_MULTIPLIER` | 0.5 到 5.0，步长 0.5。 |
-| `CORRELATION_THRESHOLD` | 0.5 到 0.9，步长 0.1。 |
-
-默认同时计算两个手续费口径：
-
-```text
---fee-rates 0,0.0001
-```
-
-网格实现没有对每组参数重复读取全部分钟数据，而是：
-
-1. 先提前筛出所有可能成为“向下龙头”的小时快照。
-2. 对每组收益率阈值和持仓阈值选出对应龙头。
-3. 用最低相关性阈值先计算所有可能跟随品种。
-4. 再按不同 `CORRELATION_THRESHOLD` 回填筛选结果。
-5. 最后统一补开空价和平空价，计算各参数组合绩效。
-
-输出目录：
-
-```text
-results/short_grid/
-```
-
-输出文件：
-
-| 文件 | 含义 |
-| --- | --- |
-| `grid_metrics.csv` | 每组参数和手续费下的绩效指标。 |
-| `grid_ranked.csv` | 按手续费、夏普比率、交易次数排序后的结果。 |
-| `parameter_summary.csv` | 按单个参数聚合的中位数表现和正收益比例。 |
-| `grid_trades.csv` | 各参数组合对应的交易明细。 |
-
-当前仓库的 `results/` 目录下尚未保存 `short_grid` 输出，因此报告只记录代码逻辑，不引用网格实证结果。
-
-## 10. 可视化输出
-
-可视化入口是：
-
-```bash
-python3 code/visualize.py
-```
-
-默认读取：
-
-```text
-results/identification/
-```
-
-默认输出：
-
-```text
-results/figures/
-```
-
-### 10.1 龙头-跟随网络图
+### 9.1 龙头-跟随网络图
 
 ![龙头-跟随网络图](results/figures/leader_follower_network.png)
 
 网络图按 `龙头品种-跟涨品种-板块` 聚合，统计出现次数和平均相关系数，默认最多展示前 60 条关系。节点按板块布局，边的粗细和出现次数相关。
 
-### 10.2 单次事件复盘页
+### 9.2 单次事件复盘页
 
 [打开可切换事件复盘页面](https://htmlpreview.github.io/?https://github.com/Ziyu-Ge/Futures-Linkages/blob/main/results/figures/event_review.html)
 
@@ -493,7 +407,13 @@ results/figures/
 | 价格走势 | 事件日前后各 10 个交易日的收盘价归一化走势。 |
 | 跟随列表 | 跟随品种、20 日相关系数和事件当前涨跌幅。 |
 
-## 11. 总结
+### 9.3 做空回测价格走势图
+
+![做空回测交易价格走势](results/figures/short_backtest_price_paths.png)
+
+这张图展示 `results/short_backtest/trades.csv` 中每笔做空交易从开空到平空之间的分钟价格走势。不同品种价格统一换算成相对开空价的涨跌幅，蓝线代表做空盈利，红线代表做空亏损。
+
+## 10. 总结
 
 这个项目的识别逻辑可以压缩成两组公式。
 
